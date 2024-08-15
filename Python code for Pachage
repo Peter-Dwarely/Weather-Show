@@ -1,0 +1,10 @@
+import PyInstaller.__main__
+
+PyInstaller.__main__.run([
+    '--name=%s' % 'Weather_show_1',
+    '--onefile',
+    '--noconsole',
+    '--exclude-module=tkinter',  # 排除不必要的模块
+    '--upx-dir=C:\\Users\\HKPL711918\\Downloads\\upx-4.2.4-win64 (2)\\upx-4.2.4-win64\\ upx.exe',  # 指定 UPX 的路径
+    'main.py'
+])
