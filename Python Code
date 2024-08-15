@@ -1,0 +1,82 @@
+import sys
+import requests
+import threading
+from PyQt5.QtWidgets import QApplication, QLabel
+from PyQt5.QtCore import Qt, QTimer
+from pystray import Icon, MenuItem, Menu
+from PIL import Image
+
+window_instance = None  # 全局变量
+
+def get_weather(api_key, city_id):
+    url = f"http://api.openweathermap.org/data/2.5/weather?id={city_id}&appid={api_key}&units=metric"
+    response = requests.get(url)
+    data = response.json()
+    print("Weather API response:", data)
+    if response.status_code == 200:
+        temp = data['main']['temp']
+        rain_prob = data.get('rain', {}).get('1h', 0)
+        return temp, rain_prob
+    else:
+        return None, None
+
+class TransparentWindow(QLabel):
+    def __init__(self, api_key, city_id):
+        super().__init__()
+        self.api_key = api_key
+        self.city_id = city_id
+        self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint | Qt.Tool)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setStyleSheet("color: red; font-size: 20px;")
+        self.update_weather()
+        self.adjustSize()
+        # 获取屏幕大小并设置窗口位置
+        screen_geometry = QApplication.desktop().availableGeometry()
+        x = screen_geometry.width() - self.width() - 100  # 右上角，调整偏移量
+        y = 10  # 距离顶部的偏移量
+        self.move(x, y)
+        self.show()
+
+        # 设置定时器，每5分钟更新一次
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_weather)
+        self.timer.start(300000)  # 300,000 毫秒 = 5 分钟
+
+    def update_weather(self):
+        temp, rain_prob = get_weather(self.api_key, self.city_id)
+        if temp is not None:
+            text = f"Temp: {temp}°C, Rain: {rain_prob*100}%"
+            print("Weather info:", text)
+            self.setText(text)
+            self.adjustSize()
+
+def create_window(api_key, city_id):
+    global window_instance
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication(sys.argv)
+    window_instance = TransparentWindow(api_key, city_id)
+    app.exec_()
+
+def quit_action(icon, item):
+    icon.stop()
+    if window_instance:
+        window_instance.close()  # 关闭透明窗口
+    sys.exit()
+
+def create_tray_icon():
+    image = Image.new('RGB', (64, 64), color=(255, 255, 255))
+    menu = Menu(MenuItem('Quit', quit_action))
+    icon = Icon("weather", image, menu=menu)
+    icon.run()
+
+def main():
+    api_key = 'bd5e378503939ddaee76f12ad7a97608'
+    city_id = '1819729'
+    window_thread = threading.Thread(target=create_window, args=(api_key, city_id))
+    tray_thread = threading.Thread(target=create_tray_icon)
+    window_thread.start()
+    tray_thread.start()
+
+if __name__ == "__main__":
+    main()
